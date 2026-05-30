@@ -1,14 +1,16 @@
 // ==UserScript==
 // @name         FurTrack Image Preview
 // @namespace    https://furtrack.com/
-// @version      2.1.0
-// @description  Hover over a post thumbnail to see the full image and tags
-// @author       Adelair
+// @version      2.2.0
+// @description  FurTrack enhancement - hover over a post thumbnail to see the full image and tags
+// @author       Adelair <adelairstonefruit@gmail.com>
 // @match        https://furtrack.com/*
 // @match        https://www.furtrack.com/*
 // @match        https://beta.furtrack.com/*
 // @grant        none
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=furtrack.com
+// @updateURL    https://github.com/adelairdragon/furtrack-mouseover-userscript/raw/refs/heads/main/furtrack-preview.user.js
+// @downloadURL  https://github.com/adelairdragon/furtrack-mouseover-userscript/raw/refs/heads/main/furtrack-preview.user.js
 // ==/UserScript==
 
 (function () {
@@ -20,18 +22,19 @@
 
   // Minimum ms before tooltip appears — prevents flash on quick mouse passes.
   // Fetch starts immediately on hover, so by this time data is usually ready.
-  const MIN_DELAY_MS = 120;
+  const MIN_FETCH_DELAY_MS = 300;
+  const MIN_DISPLAY_DELAY_MS = 120;
 
   // Must match the CSS width set on #ftp-right
   const RIGHT_PANEL_W = 210;
 
   const TAG_CATEGORIES = [
     { type: 1, label: 'Character',    color: '#f5a0c8' },
-    { type: 6, label: 'Species',      color: '#b89cf5' },
-    { type: 0, label: 'General',      color: '#a8bcd0' },
     { type: 2, label: 'Maker',        color: '#70bef5' },
     { type: 3, label: 'Photographer', color: '#f5c070' },
     { type: 5, label: 'Event',        color: '#70f5b8' },
+    { type: 6, label: 'Species',      color: '#b89cf5' },
+    { type: 0, label: 'General',      color: '#a8bcd0' },
     { type: 9, label: 'Private',      color: '#787878' },
   ];
 
@@ -99,33 +102,34 @@
   // Off by default; persists across page loads
   let previewEnabled = localStorage.getItem('ftp-enabled') === 'true';
 
+  // Cancel button is only present when the site's Select mode is active
+  const getCancelBtn = () =>
+    Array.from(document.querySelectorAll('.index-select-btn'))
+      .find(el => el.id !== 'ftp-toggle' && el.textContent.trim() === 'Cancel');
+
   const injectToggle = () => {
-    if (document.getElementById('ftp-toggle')) return;
-    const row = document.querySelector('.index-header-row');
+    const cancelBtn = getCancelBtn();
+    const existing  = document.getElementById('ftp-toggle');
+
+    if (!cancelBtn) { if (existing) existing.remove(); return; }
+    if (existing) return;
+
+    const row = cancelBtn.closest('.index-header-row');
     if (!row) return;
 
-    const wrap = document.createElement('div');
-    wrap.id = 'ftp-toggle';
-    wrap.className = previewEnabled ? 'enabled' : '';
+    const btn = document.createElement('div');
+    btn.id = 'ftp-toggle';
+    btn.className = 'index-select-btn' + (previewEnabled ? ' ftp-rainbow' : '');
+    btn.textContent = 'Preview';
 
-    const label = document.createElement('span');
-    label.id = 'ftp-toggle-label';
-    label.textContent = 'Preview';
-
-    const pill = document.createElement('span');
-    pill.id = 'ftp-toggle-pill';
-
-    wrap.appendChild(label);
-    wrap.appendChild(pill);
-
-    wrap.addEventListener('click', () => {
+    btn.addEventListener('click', () => {
       previewEnabled = !previewEnabled;
       localStorage.setItem('ftp-enabled', previewEnabled);
-      wrap.className = previewEnabled ? 'enabled' : '';
+      btn.className = 'index-select-btn' + (previewEnabled ? ' ftp-rainbow' : '');
       if (!previewEnabled) removeTooltip();
     });
 
-    row.insertBefore(wrap, row.firstChild);
+    row.insertBefore(btn, row.firstChild);
   };
 
   // ── Styles ────────────────────────────────────────────────────────────────
@@ -135,52 +139,22 @@
     const s = document.createElement('style');
     s.id = 'ftp-styles';
     s.textContent = `
-      /* ── Toggle switch ── */
-      #ftp-toggle {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        margin-right: auto;
-        padding: 4px 8px;
-        cursor: pointer;
-        user-select: none;
-        border-radius: 4px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-        font-size: 13px;
-        color: #555;
-        transition: color 0.15s;
+      /* ── Preview toggle button ── */
+      #ftp-toggle.ftp-rainbow {
+        background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #c77dff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        border-color: rgba(180, 130, 255, 0.5);
+        opacity: 1;
       }
-      #ftp-toggle:hover { color: #999; }
-      #ftp-toggle.enabled { color: #aaa; }
-
-      #ftp-toggle-pill {
-        width: 28px;
-        height: 16px;
-        border-radius: 8px;
-        background: #222;
-        border: 1px solid #333;
-        position: relative;
-        flex-shrink: 0;
-        transition: background 0.15s, border-color 0.15s;
-      }
-      #ftp-toggle-pill::after {
-        content: '';
-        position: absolute;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: #444;
-        top: 2px;
-        left: 2px;
-        transition: transform 0.15s, background 0.15s;
-      }
-      #ftp-toggle.enabled #ftp-toggle-pill {
-        background: #193028;
-        border-color: #2a5c44;
-      }
-      #ftp-toggle.enabled #ftp-toggle-pill::after {
-        background: #70f5b8;
-        transform: translateX(12px);
+      #ftp-toggle.ftp-rainbow:hover {
+        background: linear-gradient(90deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #c77dff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        border-color: rgba(180, 130, 255, 0.85);
+        opacity: 1;
       }
 
       #ftp-tooltip {
@@ -300,11 +274,11 @@
     const groups = groupTags(tags);
 
     // Resolution + low-res warning
-    const shortEdge = Math.min(post.metaWidth || 0, post.metaHeight || 0);
+    const longEdge = Math.max(post.metaWidth || 0, post.metaHeight || 0);
     const resTxt    = post.metaWidth && post.metaHeight
       ? `${post.metaWidth} × ${post.metaHeight}`
       : null;
-    const resLow = shortEdge > 0 && shortEdge < 850;
+    const resLow = longEdge > 0 && longEdge < 850;
 
     // Meta rows: [label, value, warn?]
     const metaRows = [
@@ -420,13 +394,16 @@
     lastY = e.clientY;
     e.currentTarget.addEventListener('mousemove', onMouseMove);
 
-    // Fetch starts NOW; MIN_DELAY_MS is just an anti-flash debounce.
+    // Wait before firing the fetch — avoids hammering the API on quick mouse passes.
+    await new Promise(r => setTimeout(r, MIN_FETCH_DELAY_MS));
+    if (currentHoverId !== hoverId) return;
+
     // Both must resolve before the tooltip appears — whichever finishes first
     // simply waits for the other.
     try {
       const [data] = await Promise.all([
         fetchPost(m[1]),
-        new Promise(r => setTimeout(r, MIN_DELAY_MS)),
+        new Promise(r => setTimeout(r, MIN_DISPLAY_DELAY_MS)),
       ]);
       if (currentHoverId !== hoverId) return; // user left while waiting
 
