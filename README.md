@@ -1,0 +1,28 @@
+# FurTrack Better Image Previews
+
+A userscript for [FurTrack](https://furtrack.com) that creates rich mouseover previews (showing the uncropped image, tags, and relevant EXIF data) while you are in batch select mode.
+
+---
+
+## Install
+
+1. Install your userscript manager of choice (I use [Tampermonkey](https://www.tampermonkey.net/)) as a browser addon.
+2. Click **[Install Script](https://github.com/adelairdragon/furtrack-mouseover-userscript/raw/refs/heads/main/furtrack-preview.user.js)**. Tampermonkey will open up a new tab that asks you to install the script
+3. Click **Install**.
+4. Bada bing.
+
+The script auto-updates from this repo.
+
+---
+
+## Usage
+
+The preview is **off by default**. To enable it:
+
+1. Go to any page with thumbnails (e.g. [`event:anthrocon`](https://www.furtrack.com/index/event:anthrocon)).
+2. Enable Select mode.
+3. A **✨ Fancy Previews ✨** button appears in the batch action/select row.
+4. Click it to toggle previews on/off. The setting persists across page loads.
+
+Once enabled, hover over any thumbnail to see the tooltip.
+
