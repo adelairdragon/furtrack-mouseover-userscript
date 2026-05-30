@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FurTrack Image Preview
 // @namespace    https://furtrack.com/
-// @version      2.0.1
+// @version      2.1.0
 // @description  Hover over a post thumbnail to see the full image and tags
 // @author       Adelair
 // @match        https://furtrack.com/*
@@ -94,6 +94,40 @@
     return { w: Math.floor(mw * scale), h: Math.floor(mh * scale) };
   };
 
+  // ── Toggle state ──────────────────────────────────────────────────────────
+
+  // Off by default; persists across page loads
+  let previewEnabled = localStorage.getItem('ftp-enabled') === 'true';
+
+  const injectToggle = () => {
+    if (document.getElementById('ftp-toggle')) return;
+    const row = document.querySelector('.index-header-row');
+    if (!row) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'ftp-toggle';
+    wrap.className = previewEnabled ? 'enabled' : '';
+
+    const label = document.createElement('span');
+    label.id = 'ftp-toggle-label';
+    label.textContent = 'Preview';
+
+    const pill = document.createElement('span');
+    pill.id = 'ftp-toggle-pill';
+
+    wrap.appendChild(label);
+    wrap.appendChild(pill);
+
+    wrap.addEventListener('click', () => {
+      previewEnabled = !previewEnabled;
+      localStorage.setItem('ftp-enabled', previewEnabled);
+      wrap.className = previewEnabled ? 'enabled' : '';
+      if (!previewEnabled) removeTooltip();
+    });
+
+    row.insertBefore(wrap, row.firstChild);
+  };
+
   // ── Styles ────────────────────────────────────────────────────────────────
 
   const injectStyles = () => {
@@ -101,6 +135,54 @@
     const s = document.createElement('style');
     s.id = 'ftp-styles';
     s.textContent = `
+      /* ── Toggle switch ── */
+      #ftp-toggle {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-right: auto;
+        padding: 4px 8px;
+        cursor: pointer;
+        user-select: none;
+        border-radius: 4px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        font-size: 13px;
+        color: #555;
+        transition: color 0.15s;
+      }
+      #ftp-toggle:hover { color: #999; }
+      #ftp-toggle.enabled { color: #aaa; }
+
+      #ftp-toggle-pill {
+        width: 28px;
+        height: 16px;
+        border-radius: 8px;
+        background: #222;
+        border: 1px solid #333;
+        position: relative;
+        flex-shrink: 0;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      #ftp-toggle-pill::after {
+        content: '';
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #444;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.15s, background 0.15s;
+      }
+      #ftp-toggle.enabled #ftp-toggle-pill {
+        background: #193028;
+        border-color: #2a5c44;
+      }
+      #ftp-toggle.enabled #ftp-toggle-pill::after {
+        background: #70f5b8;
+        transform: translateX(12px);
+      }
+
       #ftp-tooltip {
         position: fixed;
         z-index: 99999;
@@ -327,6 +409,7 @@
   const onMouseMove = (e) => { lastX = e.clientX; lastY = e.clientY; };
 
   const onEnter = async (e) => {
+    if (!previewEnabled) return;
     const hoverId = ++currentHoverId;
     const imgEl   = e.currentTarget.querySelector('img');
     if (!imgEl) return;
@@ -385,9 +468,11 @@
   injectStyles();
 
   new MutationObserver(() => {
+    injectToggle();
     if (document.querySelector(`.index-image:not([${ATTR}])`)) attachListeners();
   }).observe(document.body, { childList: true, subtree: true });
 
+  injectToggle();
   attachListeners();
 
 })();
