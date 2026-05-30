@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FurTrack Better Image Previews
 // @namespace    https://furtrack.com/
-// @version      2.2.1
+// @version      2.2.2
 // @description  FurTrack enhancement - hover over a post thumbnail to see the full image and tags
 // @author       Adelair <adelairstonefruit@gmail.com>
 // @match        https://furtrack.com/*
@@ -9,8 +9,8 @@
 // @match        https://beta.furtrack.com/*
 // @grant        none
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=furtrack.com
-// @updateURL    https://github.com/adelairdragon/furtrack-mouseover-userscript/raw/refs/heads/main/furtrack-preview.user.js
-// @downloadURL  https://github.com/adelairdragon/furtrack-mouseover-userscript/raw/refs/heads/main/furtrack-preview.user.js
+// @updateURL    http://github.com/adelairdragon/furtrack-mouseover-userscript/releases/latest/download/furtrack-preview.user.js
+// @downloadURL  http://github.com/adelairdragon/furtrack-mouseover-userscript/releases/latest/download/furtrack-preview.user.js
 // ==/UserScript==
 
 (function () {

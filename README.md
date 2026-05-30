@@ -7,7 +7,7 @@ A userscript for [FurTrack](https://furtrack.com) that creates rich mouseover pr
 ## Install
 
 1. Install your userscript manager of choice (I use [Tampermonkey](https://www.tampermonkey.net/)) as a browser addon.
-2. Click **[Install Script](https://github.com/adelairdragon/furtrack-mouseover-userscript/raw/refs/heads/main/furtrack-preview.user.js)**. Tampermonkey will open up a new tab that asks you to install the script
+2. Click **[Install Script](http://github.com/adelairdragon/furtrack-mouseover-userscript/releases/latest/download/furtrack-preview.user.js)**. Tampermonkey will open up a new tab that asks you to install the script
 3. Click **Install**.
 4. Bada bing.
 
