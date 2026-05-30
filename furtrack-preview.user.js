@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         FurTrack Image Preview
+// @name         FurTrack Better Image Previews
 // @namespace    https://furtrack.com/
-// @version      2.2.0
+// @version      2.2.1
 // @description  FurTrack enhancement - hover over a post thumbnail to see the full image and tags
 // @author       Adelair <adelairstonefruit@gmail.com>
 // @match        https://furtrack.com/*
@@ -120,7 +120,7 @@
     const btn = document.createElement('div');
     btn.id = 'ftp-toggle';
     btn.className = 'index-select-btn' + (previewEnabled ? ' ftp-rainbow' : '');
-    btn.textContent = 'Preview';
+    btn.textContent = '✨ Previews ✨';
 
     btn.addEventListener('click', () => {
       previewEnabled = !previewEnabled;
