@@ -116,6 +116,32 @@ Two-column flex layout:
 
 ---
 
+## Settings Panel
+
+A **⚙ Settings** button is injected into `.index-header-row` alongside the Previews toggle. Both buttons appear only when the site's own batch-select mode is active (detected by the presence of the site's "Cancel" button — see `getCancelBtn()`).
+
+Clicking Settings opens a floating panel with two independently-persisted toggles:
+
+### Drag select (`localStorage['ftp-drag-select']`)
+Hold and drag across thumbnails to select multiple at once. Delegates to the site's existing `doSelect` mechanism (React `onClick` on `.index-image`) — no custom selection state.
+
+Key implementation details:
+- **15px threshold** before drag mode arms, to avoid accidental drags from normal clicks.
+- **Interpolation**: on each `mousemove`, samples every 12px along the line from the last position to the current one via `document.elementFromPoint`. Catches every thumbnail even at fast mouse speeds.
+- **rAF queue**: hit thumbnails are pushed to a queue and flushed on `requestAnimationFrame` rather than clicked synchronously. This limits React renders to one per frame.
+- **`withReactBatch`**: tries to grab `unstable_batchedUpdates` from `window.__REACT_DEVTOOLS_GLOBAL_HOOK__.renderers` so the entire flush is a single React commit. Falls back to direct clicks if unavailable.
+- **`dragstart` prevention**: a capture-phase listener calls `e.preventDefault()` on any native browser image-drag originating inside `.index-image`, always active regardless of mode.
+- **Hover suppressed during drag**: `onEnter` returns early while `dragging === true`.
+
+### Mark mode (`localStorage['ftp-mark']`)
+Right-click a thumbnail to cycle: none → ✓ (approve next pass) → ✕ (reject/clear next pass) → none.
+
+- Marks are stored in `localStorage['ftp-marks']` as `{ [postId]: 'check' | 'x' }`.
+- Mark overlays (`.ftp-mark-icon`) are injected into `.index-image` elements and restored from storage when new thumbnails are attached by the MutationObserver.
+- Browser context menu is suppressed (`e.preventDefault()`) only when mark mode is enabled.
+
+---
+
 ## Reference Files
 
 `furtrack-client-master/src/` — dump of the site's React frontend.

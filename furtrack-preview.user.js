@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FurTrack Better Image Previews
 // @namespace    https://furtrack.com/
-// @version      2.2.2
+// @version      2.3.0
 // @description  FurTrack enhancement - hover over a post thumbnail to see the full image and tags
 // @author       Adelair <adelairstonefruit@gmail.com>
 // @match        https://furtrack.com/*
@@ -105,7 +105,7 @@
   // Cancel button is only present when the site's Select mode is active
   const getCancelBtn = () =>
     Array.from(document.querySelectorAll('.index-select-btn'))
-      .find(el => el.id !== 'ftp-toggle' && el.textContent.trim() === 'Cancel');
+      .find(el => el.id !== 'ftp-toggle' && el.id !== 'ftp-settings-btn' && el.textContent.trim() === 'Cancel');
 
   const injectToggle = () => {
     const cancelBtn = getCancelBtn();
@@ -131,6 +131,219 @@
 
     row.insertBefore(btn, row.firstChild);
   };
+
+  // ── Settings state ─────────────────────────────────────────────────────────
+
+  let dragSelectEnabled = localStorage.getItem('ftp-drag-select') === 'true';
+  let markModeEnabled   = localStorage.getItem('ftp-mark') === 'true';
+
+  const marks = (() => {
+    try { return JSON.parse(localStorage.getItem('ftp-marks') || '{}'); }
+    catch (e) { return {}; }
+  })();
+
+  const saveMark = (postId, state) => {
+    if (state == null) delete marks[postId];
+    else marks[postId] = state;
+    try { localStorage.setItem('ftp-marks', JSON.stringify(marks)); } catch (e) {}
+  };
+
+  const getPostId = (el) => {
+    const img = el.querySelector('img');
+    if (!img) return null;
+    const m = img.src.match(/\/thumb\/(\d+)\.jpg/);
+    return m ? m[1] : null;
+  };
+
+  // ── Overlays ───────────────────────────────────────────────────────────────
+
+  const updateOverlay = (el, postId) => {
+    const markState = marks[postId];
+    let icon = el.querySelector('.ftp-mark-icon');
+    if (markState) {
+      if (!icon) {
+        icon = document.createElement('div');
+        icon.className = 'ftp-mark-icon';
+        icon.setAttribute('aria-hidden', 'true');
+        el.appendChild(icon);
+      }
+      icon.dataset.mark = markState;
+      icon.textContent  = markState === 'check' ? '✓' : '✕';
+    } else if (icon) {
+      icon.remove();
+    }
+  };
+
+  const cycleMark = (postId, el) => {
+    const cur  = marks[postId];
+    const next = cur == null ? 'check' : cur === 'check' ? 'x' : null;
+    saveMark(postId, next);
+    updateOverlay(el, postId);
+  };
+
+  // ── Settings panel ─────────────────────────────────────────────────────────
+
+  let settingsPanel = null;
+
+  const updateSettingsBtn = () => {
+    const btn = document.getElementById('ftp-settings-btn');
+    if (!btn) return;
+    btn.className = 'index-select-btn' + ((dragSelectEnabled || markModeEnabled) ? ' ftp-settings-on' : '');
+  };
+
+  const closeSettingsPanel = () => {
+    if (settingsPanel) { settingsPanel.remove(); settingsPanel = null; }
+  };
+
+  const buildSettingsPanel = () => {
+    const panel = document.createElement('div');
+    panel.id = 'ftp-settings-panel';
+
+    const makeRow = (id, label, desc, enabled, onToggle) => {
+      const row = document.createElement('div');
+      row.className = 'ftp-sp-row';
+      row.id = id;
+      row.innerHTML = `
+        <div class="ftp-sp-toggle${enabled ? ' on' : ''}"><div class="ftp-sp-knob"></div></div>
+        <div class="ftp-sp-text">
+          <div class="ftp-sp-label">${label}</div>
+          <div class="ftp-sp-desc">${desc}</div>
+        </div>`;
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const newVal = onToggle();
+        // onToggle may close the panel — only update toggle if row is still in the DOM
+        if (row.isConnected) {
+          row.querySelector('.ftp-sp-toggle').className = 'ftp-sp-toggle' + (newVal ? ' on' : '');
+        }
+        updateSettingsBtn();
+      });
+      return row;
+    };
+
+    panel.appendChild(makeRow(
+      'ftp-sp-select', 'Drag select', 'Hold and drag to select multiple thumbnails',
+      dragSelectEnabled,
+      () => { dragSelectEnabled = !dragSelectEnabled; localStorage.setItem('ftp-drag-select', dragSelectEnabled); return dragSelectEnabled; }
+    ));
+    panel.appendChild(makeRow(
+      'ftp-sp-mark', 'Mark mode', 'Right-click to mark ✓ approve / ✕ reject',
+      markModeEnabled,
+      () => { markModeEnabled = !markModeEnabled; localStorage.setItem('ftp-mark', markModeEnabled); return markModeEnabled; }
+    ));
+
+    return panel;
+  };
+
+  const openSettingsPanel = (anchorBtn) => {
+    settingsPanel = buildSettingsPanel();
+    document.body.appendChild(settingsPanel);
+    const rect = anchorBtn.getBoundingClientRect();
+    const pw   = settingsPanel.offsetWidth;
+    let x = rect.left;
+    if (x + pw > window.innerWidth - 8) x = window.innerWidth - pw - 8;
+    settingsPanel.style.left = x + 'px';
+    settingsPanel.style.top  = (rect.bottom + 6) + 'px';
+  };
+
+  const injectSettingsBtn = () => {
+    const cancelBtn = getCancelBtn();
+    const existing  = document.getElementById('ftp-settings-btn');
+    if (!cancelBtn) { if (existing) existing.remove(); closeSettingsPanel(); return; }
+    if (existing) return;
+
+    const row = cancelBtn.closest('.index-header-row');
+    if (!row) return;
+
+    const btn = document.createElement('div');
+    btn.id = 'ftp-settings-btn';
+    btn.className = 'index-select-btn' + ((dragSelectEnabled || markModeEnabled) ? ' ftp-settings-on' : '');
+    btn.textContent = '⚙ Settings';
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (settingsPanel) { closeSettingsPanel(); return; }
+      openSettingsPanel(btn);
+    });
+
+    const toggle = document.getElementById('ftp-toggle');
+    if (toggle) row.insertBefore(btn, toggle.nextSibling);
+    else row.insertBefore(btn, row.firstChild);
+  };
+
+  document.addEventListener('click', (e) => {
+    if (settingsPanel && !settingsPanel.contains(e.target) && e.target.id !== 'ftp-settings-btn') {
+      closeSettingsPanel();
+    }
+  }, true);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSettingsPanel();
+  });
+
+  // ── Drag select ───────────────────────────────────────────────────────────
+
+  const DRAG_THRESHOLD = 15; // large enough to avoid accidental drags
+  const DRAG_STEP_PX   = 12; // interpolation spacing; well under thumbnail width
+
+  let dragAnchorEl  = null;
+  let dragAnchorX   = 0, dragAnchorY = 0;
+  let dragLastX     = 0, dragLastY   = 0;
+  let dragging      = false;
+  const dragVisited = new Set();
+
+  const dragHitTest = (x, y) => {
+    const under = document.elementFromPoint(x, y)?.closest('.index-image');
+    if (!under || dragVisited.has(under)) return;
+    dragVisited.add(under);
+    under.click();
+  };
+
+  // Prevent the browser's native image-drag gesture on thumbnails (accidental drag-to-paste)
+  document.addEventListener('dragstart', (e) => {
+    if (e.target.closest('.index-image')) e.preventDefault();
+  }, true);
+
+  document.addEventListener('mousedown', (e) => {
+    if (!dragSelectEnabled || e.button !== 0) return;
+    const el = e.target.closest('.index-image');
+    if (!el) return;
+    e.preventDefault(); // block the browser's native image-drag behaviour
+    dragAnchorEl = el;
+    dragAnchorX  = dragLastX = e.clientX;
+    dragAnchorY  = dragLastY = e.clientY;
+    dragging     = false;
+    dragVisited.clear();
+  }, true);
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragAnchorEl) return;
+    if (!dragging) {
+      const dx = Math.abs(e.clientX - dragAnchorX);
+      const dy = Math.abs(e.clientY - dragAnchorY);
+      if (dx < DRAG_THRESHOLD && dy < DRAG_THRESHOLD) return;
+      dragging = true;
+      dragVisited.add(dragAnchorEl);
+      dragAnchorEl.click();
+      document.body.style.userSelect = 'none';
+    }
+    const dist  = Math.hypot(e.clientX - dragLastX, e.clientY - dragLastY);
+    const steps = Math.ceil(dist / DRAG_STEP_PX);
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      dragHitTest(dragLastX + (e.clientX - dragLastX) * t,
+                  dragLastY + (e.clientY - dragLastY) * t);
+    }
+    dragLastX = e.clientX;
+    dragLastY = e.clientY;
+  }, true);
+
+  document.addEventListener('mouseup', () => {
+    dragAnchorEl = null;
+    dragging     = false;
+    dragVisited.clear();
+    document.body.style.userSelect = '';
+  }, true);
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
@@ -263,6 +476,82 @@
       }
       .ftp-tname { color: #d0d0d0; min-width: 0; word-break: break-word; }
       .ftp-tcount { color: #484848; font-size: 10px; flex-shrink: 0; }
+
+      /* ── Settings button ── */
+      #ftp-settings-btn.ftp-settings-on {
+        color: #4d96ff;
+        border-color: rgba(77, 150, 255, 0.5);
+        opacity: 1;
+      }
+
+      /* ── Settings panel ── */
+      #ftp-settings-panel {
+        position: fixed;
+        z-index: 99998;
+        background: #161616;
+        border: 1px solid #383838;
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.85);
+        overflow: hidden;
+        min-width: 230px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        font-size: 13px;
+      }
+      .ftp-sp-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .ftp-sp-row:hover { background: #1e1e1e; }
+      .ftp-sp-row + .ftp-sp-row { border-top: 1px solid #222; }
+      .ftp-sp-label { color: #d0d0d0; font-weight: 500; margin-bottom: 2px; font-size: 13px; }
+      .ftp-sp-desc  { color: #555; font-size: 11px; }
+      .ftp-sp-toggle {
+        width: 32px;
+        height: 18px;
+        border-radius: 9px;
+        background: #333;
+        flex-shrink: 0;
+        position: relative;
+        transition: background 0.18s;
+      }
+      .ftp-sp-toggle.on { background: #4d96ff; }
+      .ftp-sp-knob {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fff;
+        transition: transform 0.18s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      }
+      .ftp-sp-toggle.on .ftp-sp-knob { transform: translateX(14px); }
+
+      /* ── Thumbnail overlays ── */
+      .index-image { position: relative; }
+      .ftp-mark-icon {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .ftp-mark-icon[data-mark="check"] { background: rgba(60, 185, 100, 0.92); color: #fff; }
+      .ftp-mark-icon[data-mark="x"]     { background: rgba(210, 50, 50, 0.92);  color: #fff; }
     `;
     document.head.appendChild(s);
   };
@@ -383,7 +672,7 @@
   const onMouseMove = (e) => { lastX = e.clientX; lastY = e.clientY; };
 
   const onEnter = async (e) => {
-    if (!previewEnabled) return;
+    if (!previewEnabled || dragging) return;
     const hoverId = ++currentHoverId;
     const imgEl   = e.currentTarget.querySelector('img');
     if (!imgEl) return;
@@ -439,6 +728,18 @@
       el.setAttribute(ATTR, '1');
       el.addEventListener('mouseenter', onEnter);
       el.addEventListener('mouseleave', onLeave);
+
+      el.addEventListener('contextmenu', (e) => {
+        if (!markModeEnabled) return;
+        const pid = getPostId(el);
+        if (!pid) return;
+        e.preventDefault();
+        cycleMark(pid, el);
+      });
+
+      // Restore any saved mark on this element
+      const pid = getPostId(el);
+      if (pid && marks[pid]) updateOverlay(el, pid);
     });
   };
 
@@ -446,10 +747,12 @@
 
   new MutationObserver(() => {
     injectToggle();
+    injectSettingsBtn();
     if (document.querySelector(`.index-image:not([${ATTR}])`)) attachListeners();
   }).observe(document.body, { childList: true, subtree: true });
 
   injectToggle();
+  injectSettingsBtn();
   attachListeners();
 
 })();
