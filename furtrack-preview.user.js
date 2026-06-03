@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FurTrack Better Image Previews
 // @namespace    https://furtrack.com/
-// @version      2.3.0
+// @version      2.4.0
 // @description  FurTrack enhancement - hover over a post thumbnail to see the full image and tags
 // @author       Adelair <adelairstonefruit@gmail.com>
 // @match        https://furtrack.com/*
@@ -157,6 +157,22 @@
 
   // ── Overlays ───────────────────────────────────────────────────────────────
 
+  const MARK_CYCLE   = ['check', 'x', 'question', 'tag', 'wolf'];
+  const MARK_DISPLAY = { check: '✓', x: '✕', question: '❓', tag: '🏷️', wolf: '🐺' };
+
+  const marksConfig = (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('ftp-marks-config') || 'null');
+      return saved ?? { check: true, x: true, question: false, tag: false, wolf: true };
+    } catch (e) {
+      return { check: true, x: true, question: false, tag: false, wolf: true };
+    }
+  })();
+  const saveMarksConfig = () => {
+    try { localStorage.setItem('ftp-marks-config', JSON.stringify(marksConfig)); } catch (e) {}
+  };
+  const activeCycle = () => MARK_CYCLE.filter(m => marksConfig[m]);
+
   const updateOverlay = (el, postId) => {
     const markState = marks[postId];
     let icon = el.querySelector('.ftp-mark-icon');
@@ -168,15 +184,18 @@
         el.appendChild(icon);
       }
       icon.dataset.mark = markState;
-      icon.textContent  = markState === 'check' ? '✓' : '✕';
+      icon.textContent  = MARK_DISPLAY[markState] ?? markState;
     } else if (icon) {
       icon.remove();
     }
   };
 
   const cycleMark = (postId, el) => {
+    const cycle = activeCycle();
+    if (!cycle.length) return;
     const cur  = marks[postId];
-    const next = cur == null ? 'check' : cur === 'check' ? 'x' : null;
+    const idx  = cur == null ? -1 : cycle.indexOf(cur);
+    const next = idx >= cycle.length - 1 ? null : cycle[idx + 1];
     saveMark(postId, next);
     updateOverlay(el, postId);
   };
@@ -199,7 +218,7 @@
     const panel = document.createElement('div');
     panel.id = 'ftp-settings-panel';
 
-    const makeRow = (id, label, desc, enabled, onToggle) => {
+    const makeRow = (id, label, desc, enabled, onToggle, extra = '') => {
       const row = document.createElement('div');
       row.className = 'ftp-sp-row';
       row.id = id;
@@ -208,8 +227,10 @@
         <div class="ftp-sp-text">
           <div class="ftp-sp-label">${label}</div>
           <div class="ftp-sp-desc">${desc}</div>
+          ${extra}
         </div>`;
       row.addEventListener('click', (e) => {
+        if (e.target.closest('.ftp-sp-chip')) return; // chips handle their own clicks
         e.stopPropagation();
         const newVal = onToggle();
         // onToggle may close the panel — only update toggle if row is still in the DOM
@@ -226,11 +247,26 @@
       dragSelectEnabled,
       () => { dragSelectEnabled = !dragSelectEnabled; localStorage.setItem('ftp-drag-select', dragSelectEnabled); return dragSelectEnabled; }
     ));
-    panel.appendChild(makeRow(
-      'ftp-sp-mark', 'Mark mode', 'Right-click to mark ✓ approve / ✕ reject',
+
+    const chipsHtml = MARK_CYCLE.map(m =>
+      `<span class="ftp-sp-chip${marksConfig[m] ? ' active' : ''}" data-mark="${m}">${MARK_DISPLAY[m]}</span>`
+    ).join('');
+    const markRow = makeRow(
+      'ftp-sp-mark', 'Mark mode', 'Right-click to cycle selected marks',
       markModeEnabled,
-      () => { markModeEnabled = !markModeEnabled; localStorage.setItem('ftp-mark', markModeEnabled); return markModeEnabled; }
-    ));
+      () => { markModeEnabled = !markModeEnabled; localStorage.setItem('ftp-mark', markModeEnabled); return markModeEnabled; },
+      `<div class="ftp-sp-chips">${chipsHtml}</div>`
+    );
+    markRow.querySelectorAll('.ftp-sp-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const m = chip.dataset.mark;
+        marksConfig[m] = !marksConfig[m];
+        chip.classList.toggle('active', marksConfig[m]);
+        saveMarksConfig();
+      });
+    });
+    panel.appendChild(markRow);
 
     return panel;
   };
@@ -532,6 +568,32 @@
       }
       .ftp-sp-toggle.on .ftp-sp-knob { transform: translateX(14px); }
 
+      /* ── Mark chips ── */
+      .ftp-sp-chips {
+        display: flex;
+        gap: 5px;
+        margin-top: 7px;
+      }
+      .ftp-sp-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        border: 1px solid #2a2a2a;
+        background: #111;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+        opacity: 0.3;
+        transition: opacity 0.15s, border-color 0.15s;
+        user-select: none;
+      }
+      .ftp-sp-chip.active          { opacity: 1; border-color: #555; }
+      .ftp-sp-chip:hover           { opacity: 0.65; }
+      .ftp-sp-chip.active:hover    { opacity: 1; border-color: #777; }
+
       /* ── Thumbnail overlays ── */
       .index-image { position: relative; }
       .ftp-mark-icon {
@@ -550,8 +612,11 @@
         pointer-events: none;
         z-index: 2;
       }
-      .ftp-mark-icon[data-mark="check"] { background: rgba(60, 185, 100, 0.92); color: #fff; }
-      .ftp-mark-icon[data-mark="x"]     { background: rgba(210, 50, 50, 0.92);  color: #fff; }
+      .ftp-mark-icon[data-mark="check"]    { background: rgba(60, 185, 100, 0.92); color: #fff; }
+      .ftp-mark-icon[data-mark="x"]        { background: rgba(210, 50, 50, 0.92);  color: #fff; }
+      .ftp-mark-icon[data-mark="question"] { background: rgba(220, 155, 0, 0.92);  color: #fff; }
+      .ftp-mark-icon[data-mark="tag"]      { background: rgba(20, 20, 20, 0.85);   color: #fff; }
+      .ftp-mark-icon[data-mark="wolf"]     { background: rgba(20, 20, 20, 0.85);   color: #fff; }
     `;
     document.head.appendChild(s);
   };

@@ -17,6 +17,8 @@ The script auto-updates from this repo.
 
 ## Usage
 
+### Smarter Previews
+
 The preview is **off by default**. To enable it:
 
 1. Go to any page with thumbnails (e.g. [`event:anthrocon`](https://www.furtrack.com/index/event:anthrocon)).
@@ -26,3 +28,11 @@ The preview is **off by default**. To enable it:
 
 Once enabled, hover over any thumbnail to see the tooltip.
 
+### Other Options
+
+The **⚙️ Settings** button includes a few cool options:
+
+* **Drag Select** - Use the left mouse button to drag-select multiple photos at a time.
+* **Mark Mode** - If you're looking to make a note for later whether to act on certain photos, you can add a few symbols: ✅, ❌, ❓, 🏷️, 🐺. You can choose which symbols to cycle through. This is useful in a few situations: 
+* * You're in bulk tagging mode and are making a first tagging pass, but want to mark other photos to tag differently.
+* * You're a mod and are looking to approve some photos but deny other ones.

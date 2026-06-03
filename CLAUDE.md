@@ -134,9 +134,14 @@ Key implementation details:
 - **Hover suppressed during drag**: `onEnter` returns early while `dragging === true`.
 
 ### Mark mode (`localStorage['ftp-mark']`)
-Right-click a thumbnail to cycle: none → ✓ (approve next pass) → ✕ (reject/clear next pass) → none.
+Right-click a thumbnail to cycle through the enabled marks, then back to none.
 
-- Marks are stored in `localStorage['ftp-marks']` as `{ [postId]: 'check' | 'x' }`.
+Five mark types exist: ✓ `check`, ✕ `x`, ❓ `question`, 🏷️ `tag`, 🐺 `wolf`. The cycle only includes marks that are enabled in `marksConfig` (defaults: check, x, wolf). Disabled marks are skipped in the cycle but still render correctly on thumbnails that already carry them.
+
+- **`localStorage['ftp-marks']`** — `{ [postId]: 'check' | 'x' | 'question' | 'tag' | 'wolf' }` — the per-thumbnail marks.
+- **`localStorage['ftp-marks-config']`** — `{ check: bool, x: bool, question: bool, tag: bool, wolf: bool }` — which marks are included in the cycle. Defaults to `{ check: true, x: true, question: false, tag: false, wolf: true }`.
+- The settings panel shows a row of 5 chip buttons (one per mark type) beneath the Mark mode toggle. Clicking a chip toggles that mark in/out of the cycle independently of the main toggle.
+- `MARK_CYCLE` defines canonical order; `activeCycle()` filters it by `marksConfig` and is called fresh on each right-click.
 - Mark overlays (`.ftp-mark-icon`) are injected into `.index-image` elements and restored from storage when new thumbnails are attached by the MutationObserver.
 - Browser context menu is suppressed (`e.preventDefault()`) only when mark mode is enabled.
 
